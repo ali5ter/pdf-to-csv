@@ -20,7 +20,7 @@ prerequisites() {
 }
 
 parse_pdf() {
-    local date amount description count
+    local date amount description count tags=""
     local tmp_text_file
 
     # shellcheck disable=2046
@@ -40,6 +40,8 @@ parse_pdf() {
     # grep -E '^[0-9]{2}/[0-9]{2}/[0-9]{4}' "$TEMP_TXT_FILE" > "$tmp_text_file"
     grep -E '^[0-9]{2}/[0-9]{2}' "$TEMP_TXT_FILE" > "$tmp_text_file"
 
+    echo "Date,Payee,Amount,Tags" > "$TEMP_CSV_FILE"
+
     while read -r line; do
         # Split line: date, description, amount
         # Assume format like: 06/21/2025 1234567890 Grocery Store    -45.23
@@ -55,7 +57,9 @@ parse_pdf() {
         description=$(echo "$description" | sed -E 's/^[[:alnum:]]+[[:space:]]{2,}//')
 
         # Output as CSV row
-        printf "\"%s\",\"%s\",\"%s\"\n" "$date" "$description" "$amount" >> "$TEMP_CSV_FILE"
+        printf "\"%s\",\"%s\",\"%s\",\"%s\"\n" \
+            "$date" "$description" "$amount" "$tags" \
+            >> "$TEMP_CSV_FILE"
         count=$((count + 1))
 
     done < "$tmp_text_file"
