@@ -13,21 +13,19 @@ prerequisites() {
         echo "pdftotext is not installed. Please install it using Homebrew: brew install poppler"
         exit 1
     fi
-    if ! command -v csvformat &> /dev/null; then
-        echo "csvkit is not installed. Please install it using Homebrew: brew install csvkit"
-        exit 1
-    fi
 }
 
 parse_pdf() {
-    local date amount description count tags=""
+    local date amount description count tags="" year
     local tmp_text_file
 
+    year="$(date +%Y)"
     # shellcheck disable=2046
     tmp_text_file="$(mktemp /tmp/pdf-to-csv-$(date +%s).tmp.txt)"
 
     pdftotext -layout "$INPUT_FILE" "$TEMP_TXT_FILE"
     
+    # shellcheck disable=2181
     if [[ $? -ne 0 ]]; then
         echo "Failed to convert PDF to text."
         exit 1
@@ -40,7 +38,7 @@ parse_pdf() {
     # grep -E '^[0-9]{2}/[0-9]{2}/[0-9]{4}' "$TEMP_TXT_FILE" > "$tmp_text_file"
     grep -E '^[0-9]{2}/[0-9]{2}' "$TEMP_TXT_FILE" > "$tmp_text_file"
 
-    echo "Date,Payee,Amount,Tags" > "$TEMP_CSV_FILE"
+    echo '"Date","Payee","Amount","Tags"' > "$OUTPUT_FILE"
 
     while read -r line; do
         # Split line: date, description, amount
@@ -48,6 +46,7 @@ parse_pdf() {
 
         # You may need to adjust this parsing if your statement differs
         date=$(echo "$line" | awk '{print $1}')
+        date="$date/$year"  # Append the current year
         amount=$(echo "$line" | sed -nE 's/.*[[:space:]](-?\$?[0-9,]+\.[0-9]{2})$/\1/p')
         amount=$(echo "$amount" | tr -d '$,')
         description=$(echo "$line" | \
@@ -57,18 +56,11 @@ parse_pdf() {
         description=$(echo "$description" | sed -E 's/^[[:alnum:]]+[[:space:]]{2,}//')
 
         # Output as CSV row
-        printf "\"%s\",\"%s\",\"%s\",\"%s\"\n" \
-            "$date" "$description" "$amount" "$tags" \
-            >> "$TEMP_CSV_FILE"
+        printf '"%s","%s","%s","%s"\n' "$date" "$description" "$amount" "$tags" \
+            >> "$OUTPUT_FILE"
         count=$((count + 1))
 
     done < "$tmp_text_file"
-
-    csvformat -T "$TEMP_CSV_FILE" > "$OUTPUT_FILE"
-
-    # Remove a blank line ONLY IF the last line is empty
-    tail -r "$OUTPUT_FILE" | sed '/./,$!d' | tail -r > "${OUTPUT_FILE}.tmp" && \
-        mv "${OUTPUT_FILE}.tmp" "$OUTPUT_FILE"
 
     # Report
     echo "✅ CSV saved to $OUTPUT_FILE"
@@ -89,9 +81,9 @@ main() {
     INPUT_FILE="$1"
     # shellcheck disable=2046
     TEMP_TXT_FILE="$(mktemp /tmp/pdf-to-csv-$(date +%s).txt)"
-    # shellcheck disable=2046
-    TEMP_CSV_FILE="$(mktemp /tmp/pdf-to-csv-$(date +%s).csv)"
     OUTPUT_FILE="${INPUT_FILE%.pdf}.csv"
+
+    rm "$OUTPUT_FILE" 2>/dev/null || true
 
     parse_pdf
 }
