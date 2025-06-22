@@ -1,0 +1,56 @@
+# pdf-to-simplifi
+
+A simple Bash script for macOS to convert PDF statements into a format compatible with Quicken Simplifi.
+
+## Features
+
+- Extracts data from PDF files
+- Converts data to Quicken Simplifi-compatible CSV format
+- Easy to use from the command line
+
+## Requirements
+
+- macOS
+- `bash`
+- `pdftotext` (part of [poppler-utils](https://poppler.freedesktop.org/))
+- `awk`, `sed`, and other standard Unix utilities
+
+## Usage
+
+```bash
+./pdf-to-simplifi.sh input.pdf
+```
+
+- `input.pdf`: The PDF statement to convert  
+- The resulting CSV file will be created automatically in the same directory as the input PDF, with a similar name.
+
+## Installation
+
+1. Clone this repository:
+
+    ```bash
+    git clone https://github.com/yourusername/pdf-to-simplifi.git
+    cd pdf-to-simplifi
+    ```
+
+2. Make the script executable:
+
+    ```bash
+    chmod +x pdf-to-simplifi.sh
+    ```
+
+## Example
+
+```bash
+./pdf-to-simplifi.sh statement.pdf
+```
+
+This will generate `statement.csv` in the same directory.
+
+## License
+
+MIT License
+
+## Disclaimer
+
+This script is provided as-is. Please verify the output before importing into Simplifi.
