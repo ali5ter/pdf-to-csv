@@ -49,6 +49,12 @@ parse_pdf() {
         date="$date/$year"  # Append the current year
         amount=$(echo "$line" | sed -nE 's/.*[[:space:]](-?\$?[0-9,]+\.[0-9]{2})$/\1/p')
         amount=$(echo "$amount" | tr -d '$,')
+        # Flip the sign: turn positive to negative and vice versa
+        if [[ "$amount" == -* ]]; then
+            amount="${amount#-}"  # remove leading minus
+        else
+            amount="-$amount"     # prepend minus
+        fi
         description=$(echo "$line" | \
             sed -E 's/^[0-9]{2}\/[0-9]{2}[[:space:]]+//' | \
             sed -E 's/[[:space:]]+-?\$?[0-9][0-9,]*\.[0-9][0-9]$//')
