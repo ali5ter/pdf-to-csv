@@ -17,17 +17,18 @@ prerequisites() {
 
 parse_pdf() {
     local date amount description count tags="" year
-    local tmp_text_file
+    local filtered_text_file
 
     year="$(date +%Y)"
     # shellcheck disable=2046
-    tmp_text_file="$(mktemp /tmp/pdf-to-csv-$(date +%s).tmp.txt)"
+    filtered_text_file="$(mktemp /tmp/pdf-to-csv-$(date +%s).filtered.txt)"
 
     pdftotext -layout "$INPUT_FILE" "$TEMP_TXT_FILE"
-    
+
     # shellcheck disable=2181
     if [[ $? -ne 0 ]]; then
         echo "Failed to convert PDF to text."
+        rm -f "$TEMP_TXT_FILE"
         exit 1
     fi
 
@@ -35,8 +36,8 @@ parse_pdf() {
 
     # Assuming the PDF has a consistent format, grep for lines that look like
     # transaction entries starting with a date.
-    # grep -E '^[0-9]{2}/[0-9]{2}/[0-9]{4}' "$TEMP_TXT_FILE" > "$tmp_text_file"
-    grep -E '^[0-9]{2}/[0-9]{2}' "$TEMP_TXT_FILE" > "$tmp_text_file"
+    # grep -E '^[0-9]{2}/[0-9]{2}/[0-9]{4}' "$TEMP_TXT_FILE" > "$filtered_text_file"
+    grep -E '^[0-9]{2}/[0-9]{2}' "$TEMP_TXT_FILE" > "$filtered_text_file"
 
     echo '"Date","Payee","Amount","Tags"' > "$OUTPUT_FILE"
 
@@ -66,7 +67,10 @@ parse_pdf() {
             >> "$OUTPUT_FILE"
         count=$((count + 1))
 
-    done < "$tmp_text_file"
+    done < "$filtered_text_file"
+
+    # Cleanup temporary files
+    rm -f "$filtered_text_file" "$TEMP_TXT_FILE"
 
     # Report
     echo "✅ CSV saved to $OUTPUT_FILE"

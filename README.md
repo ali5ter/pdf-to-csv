@@ -29,7 +29,7 @@ A simple Bash script for macOS to convert PDF statements into a csv format. This
 1. Clone this repository:
 
     ```bash
-    git clone https://github.com/yourusername/pdf-to-csv.git
+    git clone https://github.com/ali5ter/pdf-to-csv.git
     cd pdf-to-csv
     ```
 
