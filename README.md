@@ -11,9 +11,10 @@ A simple Bash script for macOS to convert PDF statements into a csv format. This
 ## Requirements
 
 - macOS
-- `bash`
+- `bash` 4.0+
 - `pdftotext` (part of [poppler-utils](https://poppler.freedesktop.org/))
 - `awk`, `sed`, and other standard Unix utilities
+- [pfb](https://github.com/ali5ter/pfb) - included as a git submodule for enhanced terminal feedback
 
 ## Usage
 
@@ -26,11 +27,17 @@ A simple Bash script for macOS to convert PDF statements into a csv format. This
 
 ## Installation
 
-1. Clone this repository:
+1. Clone this repository with submodules:
 
     ```bash
-    git clone https://github.com/ali5ter/pdf-to-csv.git
+    git clone --recurse-submodules https://github.com/ali5ter/pdf-to-csv.git
     cd pdf-to-csv
+    ```
+
+    If you've already cloned without submodules, initialize them:
+
+    ```bash
+    git submodule update --init
     ```
 
 2. Make the script executable:

@@ -1,16 +1,21 @@
 #!/usr/bin/env bash
+
 # @file pdf-to-csv.sh
 # Take a PDF file of a credit card statement and convert it to a CSV file
 # that's importable to something like Quiken Simplifi.
 # @author Alister Lewis-Bowen <alister@lewis-bowen.org>
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/pfb/pfb.sh"
+
 prerequisites() {
     if [[ "$OSTYPE" != "darwin"* ]]; then
-        echo "This script is designed to run on macOS only."
+        pfb error "This script is designed to run on macOS only."
         exit 1
     fi
     if ! command -v pdftotext &> /dev/null; then
-        echo "pdftotext is not installed. Please install it using Homebrew: brew install poppler"
+        pfb error "pdftotext is not installed. Please install it using Homebrew: brew install poppler"
         exit 1
     fi
 }
@@ -23,14 +28,18 @@ parse_pdf() {
     # shellcheck disable=2046
     filtered_text_file="$(mktemp /tmp/pdf-to-csv-$(date +%s).filtered.txt)"
 
-    pdftotext -layout "$INPUT_FILE" "$TEMP_TXT_FILE"
+    pfb spinner start "Converting PDF to text..."
+    pdftotext -layout "$INPUT_FILE" "$TEMP_TXT_FILE" 2>/dev/null
+    local exit_code=$?
+    pfb spinner stop
 
-    # shellcheck disable=2181
-    if [[ $? -ne 0 ]]; then
-        echo "Failed to convert PDF to text."
+    if [[ $exit_code -ne 0 ]]; then
+        pfb error "Failed to convert PDF to text."
         rm -f "$TEMP_TXT_FILE"
         exit 1
     fi
+    pfb success "PDF converted successfully"
+    echo
 
     count=0
 
@@ -41,6 +50,7 @@ parse_pdf() {
 
     echo '"Date","Payee","Amount","Tags"' > "$OUTPUT_FILE"
 
+    pfb spinner start "Parsing transactions..."
     while read -r line; do
         # Split line: date, description, amount
         # Assume format like: 06/21/2025 1234567890 Grocery Store    -45.23
@@ -68,13 +78,14 @@ parse_pdf() {
         count=$((count + 1))
 
     done < "$filtered_text_file"
+    pfb spinner stop
 
     # Cleanup temporary files
     rm -f "$filtered_text_file" "$TEMP_TXT_FILE"
 
     # Report
-    echo "✅ CSV saved to $OUTPUT_FILE"
-    echo "📊 $count transactions parsed successfully."
+    pfb success "CSV saved to $OUTPUT_FILE"
+    pfb subheading "$count transactions parsed successfully"
 }
 
 main() {
@@ -82,7 +93,7 @@ main() {
     set -eou pipefail
 
     if [[ $# -ne 1 ]]; then
-        echo "Usage: $0 <path-to-pdf-file>"
+        pfb error "Usage: $0 <path-to-pdf-file>"
         exit 1
     fi
 
@@ -93,7 +104,18 @@ main() {
     TEMP_TXT_FILE="$(mktemp /tmp/pdf-to-csv-$(date +%s).txt)"
     OUTPUT_FILE="${INPUT_FILE%.pdf}.csv"
 
-    rm "$OUTPUT_FILE" 2>/dev/null || true
+    pfb heading "Converting $(basename "$INPUT_FILE")"
+    echo
+
+    # Check if output file exists and confirm overwrite
+    if [[ -f "$OUTPUT_FILE" ]]; then
+        if ! pfb confirm "Output file already exists. Overwrite?"; then
+            pfb info "Operation cancelled"
+            exit 0
+        fi
+        rm "$OUTPUT_FILE"
+        echo
+    fi
 
     parse_pdf
 }
