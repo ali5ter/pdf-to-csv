@@ -48,7 +48,8 @@ parse_pdf() {
     # grep -E '^[0-9]{2}/[0-9]{2}/[0-9]{4}' "$TEMP_TXT_FILE" > "$filtered_text_file"
     grep -E '^[0-9]{2}/[0-9]{2}' "$TEMP_TXT_FILE" > "$filtered_text_file"
 
-    echo '"Date","Payee","Amount","Tags"' > "$OUTPUT_FILE"
+    # Use Simplifi's required headers: Date,Payee,Amount,Category,Tags,Notes,Check_No
+    echo '"Date","Payee","Amount","Category","Tags","Notes","Check_No"' > "$OUTPUT_FILE"
 
     pfb spinner start "Parsing transactions..."
     while read -r line; do
@@ -57,23 +58,31 @@ parse_pdf() {
 
         # You may need to adjust this parsing if your statement differs
         date=$(echo "$line" | awk '{print $1}')
-        date="$date/$year"  # Append the current year
+        # Format as M/D/YYYY (4-digit year required by Simplifi)
+        date="$date/$year"
+
         amount=$(echo "$line" | sed -nE 's/.*[[:space:]](-?\$?[0-9,]+\.[0-9]{2})$/\1/p')
+        # Remove $ and commas as required by Simplifi
         amount=$(echo "$amount" | tr -d '$,')
+
         # Flip the sign: turn positive to negative and vice versa
+        # Simplifi expects negative for expenses
         if [[ "$amount" == -* ]]; then
             amount="${amount#-}"  # remove leading minus
         else
             amount="-$amount"     # prepend minus
         fi
+
         description=$(echo "$line" | \
             sed -E 's/^[0-9]{2}\/[0-9]{2}[[:space:]]+//' | \
             sed -E 's/[[:space:]]+-?\$?[0-9][0-9,]*\.[0-9][0-9]$//')
         # Clean up description by removing any bank reference #
         description=$(echo "$description" | sed -E 's/^[[:alnum:]]+[[:space:]]{2,}//')
 
-        # Output as CSV row
-        printf '"%s","%s","%s","%s"\n' "$date" "$description" "$amount" "$tags" \
+        # Output as CSV row with all required Simplifi fields (all quoted)
+        # Category left empty - will import as "Uncategorized" unless it exists in account
+        printf '"%s","%s","%s","%s","%s","%s","%s"\n' \
+            "$date" "$description" "$amount" "" "" "" "" \
             >> "$OUTPUT_FILE"
         count=$((count + 1))
 

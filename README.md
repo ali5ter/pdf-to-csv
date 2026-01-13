@@ -1,11 +1,13 @@
 # pdf-to-csv
 
-A simple Bash script for macOS to convert PDF statements into a csv format. This particular csv format is compatible with Quicken Simplifi.
+A simple Bash script for macOS to convert PDF statements into CSV format for Quicken Simplifi import. Uses the correct Simplifi import format (which differs from their documentation).
 
 ## Features
 
-- Extracts data from PDF files
-- Converts data to Quicken Simplifi-compatible CSV format
+- Extracts transaction data from PDF files
+- Converts to Quicken Simplifi-compatible CSV format with proper headers and formatting
+- Interactive confirmation before overwriting files
+- Visual feedback with spinners and colored status messages
 - Easy to use from the command line
 
 ## Requirements
@@ -53,6 +55,18 @@ A simple Bash script for macOS to convert PDF statements into a csv format. This
 ```
 
 This will generate `statement.csv` in the same directory.
+
+## Output Format
+
+The script generates CSV files in the correct Quicken Simplifi import format:
+
+- **Headers**: Date,Payee,Amount,Category,Tags,Notes,Check_No
+- **Date format**: M/D/YYYY (4-digit year required)
+- **Amount format**: No $ or commas, negative for expenses (e.g., "-50.00")
+- **All fields quoted**: Ensures compatibility with Simplifi's import
+- **Category field**: Left empty (will import as "Uncategorized" in Simplifi)
+
+**Note**: Simplifi's documentation incorrectly shows 2-digit years (M/D/YY), but the actual import requires 4-digit years (M/D/YYYY).
 
 ## License
 
