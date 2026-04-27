@@ -17,12 +17,12 @@
 #   1  Error (wrong OS, missing dependency, bad input, conversion failure)
 
 prerequisites() {
-    if [[ "$OSTYPE" != "darwin"* ]]; then
-        pfb error "This script is designed to run on macOS only."
-        exit 1
-    fi
     if ! command -v pfb &> /dev/null; then
         echo "ERROR: pfb is not installed. See https://github.com/ali5ter/pfb" >&2
+        exit 1
+    fi
+    if [[ "$OSTYPE" != "darwin"* ]]; then
+        pfb error "This script is designed to run on macOS only."
         exit 1
     fi
     if ! command -v pdftotext &> /dev/null; then
