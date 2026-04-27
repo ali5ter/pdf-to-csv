@@ -1,17 +1,28 @@
 #!/usr/bin/env bash
-
 # @file pdf-to-csv.sh
-# Take a PDF file of a credit card statement and convert it to a CSV file
-# that's importable to something like Quiken Simplifi.
+# @brief Convert a credit card statement PDF to a Quicken Simplifi-compatible CSV.
 # @author Alister Lewis-Bowen <alister@lewis-bowen.org>
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck disable=SC1091
-source "$SCRIPT_DIR/lib/pfb/pfb.sh"
+# @version 1.1.0
+# @date 2026-04-27
+# @license MIT
+#
+# @usage pdf-to-csv.sh <path-to-pdf-file>
+#
+# @dependencies
+#   pfb        - Terminal feedback library (https://github.com/ali5ter/pfb)
+#   pdftotext  - Part of poppler-utils (brew install poppler)
+#
+# @exitcodes
+#   0  Success
+#   1  Error (wrong OS, missing dependency, bad input, conversion failure)
 
 prerequisites() {
     if [[ "$OSTYPE" != "darwin"* ]]; then
         pfb error "This script is designed to run on macOS only."
+        exit 1
+    fi
+    if ! command -v pfb &> /dev/null; then
+        echo "ERROR: pfb is not installed. See https://github.com/ali5ter/pfb" >&2
         exit 1
     fi
     if ! command -v pdftotext &> /dev/null; then
@@ -20,6 +31,8 @@ prerequisites() {
     fi
 }
 
+# @param $1  Path to the input PDF file (INPUT_FILE must be set)
+# @side_effects Writes OUTPUT_FILE; removes temporary files
 parse_pdf() {
     local date amount description count tags="" year
     local filtered_text_file
@@ -43,9 +56,6 @@ parse_pdf() {
 
     count=0
 
-    # Assuming the PDF has a consistent format, grep for lines that look like
-    # transaction entries starting with a date.
-    # grep -E '^[0-9]{2}/[0-9]{2}/[0-9]{4}' "$TEMP_TXT_FILE" > "$filtered_text_file"
     grep -E '^[0-9]{2}/[0-9]{2}' "$TEMP_TXT_FILE" > "$filtered_text_file"
 
     # Use Simplifi's required headers: Date,Payee,Amount,Category,Tags,Notes,Check_No
@@ -53,10 +63,6 @@ parse_pdf() {
 
     pfb spinner start "Parsing transactions..."
     while read -r line; do
-        # Split line: date, description, amount
-        # Assume format like: 06/21/2025 1234567890 Grocery Store    -45.23
-
-        # You may need to adjust this parsing if your statement differs
         date=$(echo "$line" | awk '{print $1}')
         # Format as M/D/YYYY (4-digit year required by Simplifi)
         date="$date/$year"
@@ -65,22 +71,19 @@ parse_pdf() {
         # Remove $ and commas as required by Simplifi
         amount=$(echo "$amount" | tr -d '$,')
 
-        # Flip the sign: turn positive to negative and vice versa
-        # Simplifi expects negative for expenses
+        # Simplifi expects negative for expenses; flip the sign from statement
         if [[ "$amount" == -* ]]; then
-            amount="${amount#-}"  # remove leading minus
+            amount="${amount#-}"
         else
-            amount="-$amount"     # prepend minus
+            amount="-$amount"
         fi
 
         description=$(echo "$line" | \
             sed -E 's/^[0-9]{2}\/[0-9]{2}[[:space:]]+//' | \
             sed -E 's/[[:space:]]+-?\$?[0-9][0-9,]*\.[0-9][0-9]$//')
-        # Clean up description by removing any bank reference #
+        # Remove bank reference numbers from description
         description=$(echo "$description" | sed -E 's/^[[:alnum:]]+[[:space:]]{2,}//')
 
-        # Output as CSV row with all required Simplifi fields (all quoted)
-        # Category left empty - will import as "Uncategorized" unless it exists in account
         printf '"%s","%s","%s","%s","%s","%s","%s"\n' \
             "$date" "$description" "$amount" "" "" "" "" \
             >> "$OUTPUT_FILE"
@@ -89,10 +92,8 @@ parse_pdf() {
     done < "$filtered_text_file"
     pfb spinner stop
 
-    # Cleanup temporary files
     rm -f "$filtered_text_file" "$TEMP_TXT_FILE"
 
-    # Report
     pfb success "CSV saved to $OUTPUT_FILE"
     pfb subheading "$count transactions parsed successfully"
 }
@@ -116,7 +117,6 @@ main() {
     pfb heading "Converting $(basename "$INPUT_FILE")"
     echo
 
-    # Check if output file exists and confirm overwrite
     if [[ -f "$OUTPUT_FILE" ]]; then
         if ! pfb confirm "Output file already exists. Overwrite?"; then
             pfb info "Operation cancelled"
@@ -129,5 +129,4 @@ main() {
     parse_pdf
 }
 
-# Run the script so it is being executed directly
 [ "${BASH_SOURCE[0]}" -ef "$0" ] && main "$@"
