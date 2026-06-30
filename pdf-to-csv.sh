@@ -2,8 +2,8 @@
 # @file pdf-to-csv.sh
 # @brief Convert a credit card statement PDF to a Quicken Simplifi-compatible CSV.
 # @author Alister Lewis-Bowen <alister@lewis-bowen.org>
-# @version 1.1.0
-# @date 2026-04-27
+# @version 1.2.0
+# @date 2026-06-30
 # @license MIT
 #
 # @usage pdf-to-csv.sh <path-to-pdf-file>
@@ -34,10 +34,21 @@ prerequisites() {
 # @param $1  Path to the input PDF file (INPUT_FILE must be set)
 # @side_effects Writes OUTPUT_FILE; removes temporary files
 parse_pdf() {
-    local date amount description count tags="" year
+    local date amount description count tags="" year tx_month tx_year
     local filtered_text_file
+    local statement_month statement_year
 
-    year="$(date +%Y)"
+    # Derive statement month/year from filename (expects *MMDDYYYY.pdf convention).
+    # Transactions whose month is later than the statement month belong to the prior year
+    # (e.g. December charges appearing on a February statement are from last year).
+    if [[ "$(basename "$INPUT_FILE")" =~ ([0-9]{2})([0-9]{2})([0-9]{4})\.(pdf|PDF)$ ]]; then
+        statement_month="${BASH_REMATCH[1]#0}"   # strip leading zero → 1-12
+        statement_year="${BASH_REMATCH[3]}"
+    else
+        # Fallback: assume statement closed this month
+        statement_month="$(date +%-m)"
+        statement_year="$(date +%Y)"
+    fi
     # shellcheck disable=2046
     filtered_text_file="$(mktemp /tmp/pdf-to-csv-$(date +%s).filtered.txt)"
 
@@ -64,8 +75,16 @@ parse_pdf() {
     pfb spinner start "Parsing transactions..."
     while read -r line; do
         date=$(echo "$line" | awk '{print $1}')
-        # Format as M/D/YYYY (4-digit year required by Simplifi)
-        date="$date/$year"
+        # Format as M/D/YYYY (4-digit year required by Simplifi).
+        # A transaction month later than the statement month must be from the prior year.
+        tx_month="${date%%/*}"
+        tx_month="${tx_month#0}"   # strip leading zero
+        if [[ "$tx_month" -gt "$statement_month" ]]; then
+            tx_year=$(( statement_year - 1 ))
+        else
+            tx_year="$statement_year"
+        fi
+        date="$date/$tx_year"
 
         amount=$(echo "$line" | sed -nE 's/.*[[:space:]](-?\$?[0-9,]+\.[0-9]{2})$/\1/p')
         # Remove $ and commas as required by Simplifi
