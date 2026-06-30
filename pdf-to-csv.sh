@@ -2,7 +2,7 @@
 # @file pdf-to-csv.sh
 # @brief Convert a credit card statement PDF to a Quicken Simplifi-compatible CSV.
 # @author Alister Lewis-Bowen <alister@lewis-bowen.org>
-# @version 1.2.0
+# @version 1.3.0
 # @date 2026-06-30
 # @license MIT
 #
@@ -17,12 +17,8 @@
 #   1  Error (wrong OS, missing dependency, bad input, conversion failure)
 
 prerequisites() {
-    if ! command -v pfb &> /dev/null; then
-        echo "ERROR: pfb is not installed. See https://github.com/ali5ter/pfb" >&2
-        exit 1
-    fi
     if [[ "$OSTYPE" != "darwin"* ]]; then
-        pfb error "This script is designed to run on macOS only."
+        echo "ERROR: This script is designed to run on macOS only." >&2
         exit 1
     fi
     if ! command -v pdftotext &> /dev/null; then
@@ -120,6 +116,20 @@ parse_pdf() {
 main() {
     [[ -n $DEBUG ]] && set -x
     set -eou pipefail
+
+    # Source pfb from the local submodule so spinner start/stop share the same
+    # shell process and PFB_SPINNER_PID. Calling pfb as an external binary makes
+    # each invocation a separate process, causing spinner stop to have no effect
+    # and leaving animation loops running indefinitely.
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [[ -f "$script_dir/lib/pfb/pfb.sh" ]]; then
+        # shellcheck source=lib/pfb/pfb.sh
+        source "$script_dir/lib/pfb/pfb.sh"
+    elif ! command -v pfb &>/dev/null; then
+        echo "ERROR: pfb not found. Clone with --recurse-submodules or install pfb. See https://github.com/ali5ter/pfb" >&2
+        exit 1
+    fi
 
     if [[ $# -ne 1 ]]; then
         pfb error "Usage: $0 <path-to-pdf-file>"
